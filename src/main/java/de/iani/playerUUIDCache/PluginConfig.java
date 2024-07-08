@@ -13,10 +13,8 @@ public class PluginConfig {
 
     public PluginConfig(PlayerUUIDCache plugin) {
         Configuration config = plugin.getConfiguration();
-        if (config.getInt("nameHistoryCacheExpirationTime", -1) == -1) {
-            config.setProperty("nameHistoryCacheExpirationTime", 2147483647);
-            config.save();
-        }
+        config.save();
+        config.load();
         useSQL = config.getBoolean("useSQL", false);
         memoryCacheExpirationTime = !useSQL ? -1 : config.getInt("memoryCacheExpirationTime", 2147483647);
         nameHistoryCacheExpirationTime = config.getInt("nameHistoryCacheExpirationTime", 2147483647); // 30 days

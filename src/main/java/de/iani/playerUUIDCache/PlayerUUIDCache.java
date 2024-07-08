@@ -36,6 +36,7 @@ import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.config.Configuration;
 
 public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     public static final long PROFILE_PROPERTIES_CACHE_EXPIRATION_TIME = 1000 * 60 * 60 * 24;// 1 day
@@ -73,12 +74,13 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     public void onEnable() {
         currentThred = Thread.currentThread();
         logger = Logger.getLogger("PlayerUUICache");
+        createDefaultConfig();
         reloadConfig();
         PluginManager pm = getServer().getPluginManager();
         PlayerLoginListener playerListener = new PlayerLoginListener();
         pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Lowest, this);
         pm.registerEvent(Event.Type.PLAYER_QUIT, playerListener, Event.Priority.Lowest, this);
-        getServer().getServicesManager().register(PlayerUUIDCacheAPI.class, this, this, ServicePriority.Normal);
+        //TODO REGISTER getServer().getServicesManager().register(PlayerUUIDCacheAPI.class, this, this, ServicePriority.Normal);
     }
 
     @Override
@@ -94,6 +96,26 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         if (database != null) {
             database.disconnect();
             database = null;
+        }
+    }
+
+    private void createDefaultConfig() {
+        Configuration config = getConfiguration();
+        config.save();
+        config.load();
+        System.out.println("Create PlayerUUIDCache Default Config");
+        if (config.getKeys(null).isEmpty()) {
+            config.setProperty("useSQL", "false");
+            config.setProperty("memoryCacheExpirationTime", "-1");
+            config.setProperty("nameHistoryCacheExpirationTime", "2147483647");
+            config.setProperty("database.host", "localhost");
+            config.setProperty("database.user", "CHANGETHIS");
+            config.setProperty("database.password", "CHANGETHIS");
+            config.setProperty("database.database", "CHANGETHIS");
+            config.setProperty("database.tablename", "playeruuids");
+            config.setProperty("database.profilestablename", "playerprofiles");
+            config.save();
+            config.load();
         }
     }
 
