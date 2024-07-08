@@ -1,6 +1,5 @@
 package de.iani.playerUUIDCache;
 
-import com.destroystokyo.paper.profile.ProfileProperty;
 import de.iani.playerUUIDCache.NameHistory.NameChange;
 import de.iani.playerUUIDCache.util.sql.MySQLConnection;
 import de.iani.playerUUIDCache.util.sql.SQLConnection;
@@ -15,15 +14,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.YamlConfiguration;
 
 public class UUIDDatabase {
     private final SQLConnection connection;
 
     private final String tableName;
-
-    private final String profilesTableName;
 
     private final String nameHistoriesTableName;
 
@@ -38,14 +33,6 @@ public class UUIDDatabase {
     private final String searchPlayersByPartialName;
 
     private final String selectAllPlayers;
-
-    private final String insertPlayerProfile;
-
-    private final String selectPlayerProfileByUUID;
-
-    private final String deleteOldPlayerProfiles;
-
-    private boolean mayUseProfilesTable;
 
     private final String insertNameHistory;
 
@@ -62,7 +49,6 @@ public class UUIDDatabase {
     public UUIDDatabase(SQLConfig config) throws SQLException {
         connection = new MySQLConnection(config.getHost(), config.getDatabase(), config.getUser(), config.getPassword());
         tableName = config.getTableName();
-        profilesTableName = config.getProfilesTableName();
         nameHistoriesTableName = config.getNameHistoriesTableName();
         nameChangesTableName = config.getNameChangesTableName();
 
@@ -88,12 +74,6 @@ public class UUIDDatabase {
             }
             return null;
         });
-
-        insertPlayerProfile = "INSERT INTO " + profilesTableName + " (uuid, profile, lastSeen) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE profile = ?, lastSeen = ?";
-
-        selectPlayerProfileByUUID = "SELECT profile, lastSeen FROM " + profilesTableName + " WHERE uuid = ?";
-
-        deleteOldPlayerProfiles = "DELETE FROM " + profilesTableName + " WHERE lastSeen < ?";
 
         insertNameHistory = "INSERT INTO " + nameHistoriesTableName + " (uuid, firstName, refreshed) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE refreshed = ?";
 
@@ -139,22 +119,6 @@ public class UUIDDatabase {
             return null;
         });
 
-    }
-
-    public void createProfilePropertiesTable() throws SQLException {
-        this.connection.runCommands((connection, sqlConnection) -> {
-            if (!sqlConnection.hasTable(profilesTableName)) {
-                Statement smt = connection.createStatement();
-                smt.executeUpdate("CREATE TABLE `" + profilesTableName + "` ("//
-                        + "`uuid` CHAR( 36 ) NOT NULL,"//
-                        + "`profile` MEDIUMTEXT NOT NULL ,"//
-                        + "`lastSeen` BIGINT NOT NULL DEFAULT '0',"//
-                        + "PRIMARY KEY ( `uuid` ), INDEX ( `lastSeen` ) ) ENGINE = innodb");
-                smt.close();
-            }
-            return null;
-        });
-        mayUseProfilesTable = true;
     }
 
     public void addOrUpdatePlayers(final CachedPlayer... entries) throws SQLException {
@@ -265,72 +229,6 @@ public class UUIDDatabase {
 
     public void disconnect() {
         connection.disconnect();
-    }
-
-    public void addOrUpdatePlayerProfile(CachedPlayerProfile entry) throws SQLException {
-        if (!mayUseProfilesTable) {
-            return;
-        }
-        this.connection.runCommands((connection, sqlConnection) -> {
-            PreparedStatement smt = sqlConnection.getOrCreateStatement(insertPlayerProfile);
-            smt.setString(1, entry.getUUID().toString());
-            YamlConfiguration yaml = new YamlConfiguration();
-            for (ProfileProperty pp : entry.getProperties()) {
-                ConfigurationSection section = yaml.createSection(pp.getName());
-                section.set("value", pp.getValue());
-                section.set("signature", pp.getSignature());
-            }
-            String properties = yaml.saveToString();
-            smt.setString(2, properties);
-            smt.setLong(3, entry.getLastSeen());
-            smt.setString(4, properties);
-            smt.setLong(5, entry.getLastSeen());
-            smt.executeUpdate();
-            return null;
-        });
-    }
-
-    public CachedPlayerProfile getPlayerProfile(UUID uuid) throws SQLException {
-        if (!mayUseProfilesTable) {
-            return null;
-        }
-        return this.connection.runCommands((connection, sqlConnection) -> {
-            PreparedStatement smt = sqlConnection.getOrCreateStatement(selectPlayerProfileByUUID);
-            smt.setString(1, uuid.toString());
-            ResultSet rs = smt.executeQuery();
-            if (rs.next()) {
-                YamlConfiguration yaml = new YamlConfiguration();
-                try {
-                    yaml.loadFromString(rs.getString(1));
-                } catch (Throwable t) {
-                    return null;
-                }
-                LinkedHashSet<ProfileProperty> properties = new LinkedHashSet<>();
-                for (String name : yaml.getKeys(false)) {
-                    ConfigurationSection section = yaml.getConfigurationSection(name);
-                    if (section != null) {
-                        String value = section.getString("value");
-                        String signature = section.getString("signature");
-                        properties.add(new ProfileProperty(name, value, signature));
-                    }
-                }
-
-                long time = rs.getLong(2);
-                rs.close();
-                return new CachedPlayerProfile(uuid, properties, time, System.currentTimeMillis());
-            }
-            rs.close();
-            return null;
-        });
-    }
-
-    public void deleteOldPlayerProfiles() throws SQLException {
-        this.connection.runCommands((connection, sqlConnection) -> {
-            PreparedStatement smt = sqlConnection.getOrCreateStatement(deleteOldPlayerProfiles);
-            smt.setLong(1, System.currentTimeMillis() - PlayerUUIDCache.PROFILE_PROPERTIES_CACHE_EXPIRATION_TIME * 2);
-            smt.executeUpdate();
-            return null;
-        });
     }
 
     public void addOrUpdateHistory(final NameHistory history) throws SQLException {

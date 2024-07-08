@@ -1,21 +1,20 @@
 package de.iani.playerUUIDCache;
 
-import com.destroystokyo.paper.profile.PlayerProfile;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Date;
-import java.util.Map;
+import java.net.InetSocketAddress;
 import java.util.UUID;
-import org.bukkit.BanEntry;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.Statistic;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
 
-public final class CachedPlayer implements OfflinePlayer {
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Egg;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Snowball;
+import org.bukkit.entity.Vehicle;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
+
+public final class CachedPlayer implements Player {
     private final UUID uuid;
 
     private final String name;
@@ -25,8 +24,6 @@ public final class CachedPlayer implements OfflinePlayer {
     private final long cacheLoadTime;
 
     public CachedPlayer(UUID uuid, String name, long lastSeen, long cacheLoadTime) {
-        com.google.common.base.Preconditions.checkNotNull(uuid);
-        com.google.common.base.Preconditions.checkNotNull(name);
         this.uuid = uuid;
         this.name = name;
         this.lastSeen = lastSeen;
@@ -42,28 +39,82 @@ public final class CachedPlayer implements OfflinePlayer {
         return uuid;
     }
 
+    public UUID getUniqueId() {
+        return uuid;
+    }
+
     /**
      * Gets the name of the cached player. This is never null, but the name might be outdated.
      *
      * @return the name of the player
      */
+
+    @Override
+    public String getDisplayName() {
+        return name;
+    }
+
+    @Override
+    public void setDisplayName(String s) {
+
+    }
+
+    public long getLastSeen() {
+        return lastSeen;
+    }
+
+    @Override
+    public void setCompassTarget(Location location) {
+
+    }
+
+    long getCacheLoadTime() {
+        return cacheLoadTime;
+    }
+
+    @Override
+    public InetSocketAddress getAddress() {
+        return null;
+    }
+
+    @Override
+    public void kickPlayer(String s) {
+
+    }
+
+    @Override
+    public boolean performCommand(String s) {
+        return false;
+    }
+
+    @Override
+    public boolean isSneaking() {
+        return false;
+    }
+
+    @Override
+    public void setSneaking(boolean b) {
+
+    }
+
     @Override
     public String getName() {
         return name;
     }
 
     @Override
-    public long getLastSeen() {
-        return lastSeen;
+    public PlayerInventory getInventory() {
+        return null;
     }
 
     @Override
-    public long getLastLogin() {
-        return lastSeen;
+    public ItemStack getItemInHand() {
+        return null;
     }
 
-    long getCacheLoadTime() {
-        return cacheLoadTime;
+    @Override
+    public void setItemInHand(ItemStack itemStack) {
+
     }
 
     @Override
@@ -81,199 +132,108 @@ public final class CachedPlayer implements OfflinePlayer {
     }
 
     @Override
+    public void sendMessage(String s) {
+
+    }
+
+    @Override
     public boolean isOp() {
-        return Bukkit.getOfflinePlayer(uuid).isOp();
-    }
-
-    @Override
-    public void setOp(boolean value) {
-        Bukkit.getOfflinePlayer(uuid).setOp(value);
-    }
-
-    @Override
-    public Map<String, Object> serialize() {
-        return Bukkit.getOfflinePlayer(uuid).serialize();
-    }
-
-    @Override
-    public boolean isOnline() {
-        return Bukkit.getPlayer(uuid) != null;
-    }
-
-    @Override
-    public UUID getUniqueId() {
-        return uuid;
-    }
-
-    @Override
-    public boolean isBanned() {
-        return Bukkit.getOfflinePlayer(uuid).isBanned();
-    }
-
-    @Override
-    public boolean isWhitelisted() {
-        return Bukkit.getOfflinePlayer(uuid).isWhitelisted();
-    }
-
-    @Override
-    public void setWhitelisted(boolean value) {
-        Bukkit.getOfflinePlayer(uuid).setWhitelisted(value);
-    }
-
-    @Override
-    public Player getPlayer() {
-        return Bukkit.getPlayer(uuid);
-    }
-
-    @Override
-    public long getFirstPlayed() {
-        return Bukkit.getOfflinePlayer(uuid).getFirstPlayed();
-    }
-
-    @Override
-    @Deprecated
-    public long getLastPlayed() {
-        return Bukkit.getOfflinePlayer(uuid).getLastPlayed();
-    }
-
-    @Override
-    public boolean hasPlayedBefore() {
-        return Bukkit.getOfflinePlayer(uuid).hasPlayedBefore();
-    }
-
-    @Override
-    @Deprecated
-    public Location getBedSpawnLocation() {
-        return Bukkit.getOfflinePlayer(uuid).getBedSpawnLocation();
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic);
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic, int amount) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic, amount);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic, int amount) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic, amount);
-    }
-
-    @Override
-    public void setStatistic(Statistic statistic, int newValue) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).setStatistic(statistic, newValue);
-    }
-
-    @Override
-    public int getStatistic(Statistic statistic) throws IllegalArgumentException {
-        return Bukkit.getOfflinePlayer(uuid).getStatistic(statistic);
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic, Material material) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic, material);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic, Material material) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic, material);
-    }
-
-    @Override
-    public int getStatistic(Statistic statistic, Material material) throws IllegalArgumentException {
-        return Bukkit.getOfflinePlayer(uuid).getStatistic(statistic, material);
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic, Material material, int amount) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic, material, amount);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic, Material material, int amount) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic, material, amount);
-    }
-
-    @Override
-    public void setStatistic(Statistic statistic, Material material, int newValue) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).setStatistic(statistic, material, newValue);
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic, EntityType entityType) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic, entityType);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic, EntityType entityType) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic, entityType);
-    }
-
-    @Override
-    public int getStatistic(Statistic statistic, EntityType entityType) throws IllegalArgumentException {
-        return Bukkit.getOfflinePlayer(uuid).getStatistic(statistic, entityType);
-    }
-
-    @Override
-    public void incrementStatistic(Statistic statistic, EntityType entityType, int amount) throws IllegalArgumentException {
-        Bukkit.getOfflinePlayer(uuid).incrementStatistic(statistic, entityType, amount);
-    }
-
-    @Override
-    public void decrementStatistic(Statistic statistic, EntityType entityType, int amount) {
-        Bukkit.getOfflinePlayer(uuid).decrementStatistic(statistic, entityType, amount);
-    }
-
-    @Override
-    public void setStatistic(Statistic statistic, EntityType entityType, int newValue) {
-        Bukkit.getOfflinePlayer(uuid).setStatistic(statistic, entityType, newValue);
-    }
-
-    @Override
-    public boolean isConnected() {
         return false;
     }
 
     @Override
-    public PlayerProfile getPlayerProfile() {
-        return Bukkit.createProfile(uuid, name);
+    public boolean isPlayer() {
+        return false;
     }
 
     @Override
-    public <E extends BanEntry<? super PlayerProfile>> E ban(String reason, Date expires, String source) {
-        return null;
+    public boolean isOnline() {
+        return true;
     }
 
-    @Override
-    public <E extends BanEntry<? super PlayerProfile>> E ban(String reason, Instant expires, String source) {
-        return null;
-    }
-
-    @Override
-    public <E extends BanEntry<? super PlayerProfile>> E ban(String reason, Duration duration, String source) {
-        return null;
-    }
-
-    @Override
-    public Location getRespawnLocation() {
-        return null;
-    }
-
-    @Override
-    public Location getLastDeathLocation() {
-        return null;
-    }
 
     @Override
     public Location getLocation() {
         return null;
+    }
+
+    @Override
+    public World getWorld() {
+        return null;
+    }
+
+    @Override
+    public void teleportTo(Location location) {
+
+    }
+
+    @Override
+    public void teleportTo(Entity entity) {
+
+    }
+
+    @Override
+    public int getEntityId() {
+        return 0;
+    }
+
+    @Override
+    public int getHealth() {
+        return 0;
+    }
+
+    @Override
+    public void setHealth(int i) {
+
+    }
+
+    @Override
+    public Egg throwEgg() {
+        return null;
+    }
+
+    @Override
+    public Snowball throwSnowball() {
+        return null;
+    }
+
+    @Override
+    public Arrow shootArrow() {
+        return null;
+    }
+
+    @Override
+    public boolean isInsideVehicle() {
+        return false;
+    }
+
+    @Override
+    public boolean leaveVehicle() {
+        return false;
+    }
+
+    @Override
+    public Vehicle getVehicle() {
+        return null;
+    }
+
+    @Override
+    public int getRemainingAir() {
+        return 0;
+    }
+
+    @Override
+    public void setRemainingAir(int i) {
+
+    }
+
+    @Override
+    public int getMaximumAir() {
+        return 0;
+    }
+
+    @Override
+    public void setMaximumAir(int i) {
+
     }
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>org.bukkit</groupId>
+  <artifactId>CraftBukkit</artifactId>
+  <versioning>
+    <latest>1.2beta</latest>
+    <versions>
+      <version>1.2beta</version>
+    </versions>
+    <lastUpdated>20220718190218</lastUpdated>
+  </versioning>
+</metadata>

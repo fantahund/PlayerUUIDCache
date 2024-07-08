@@ -1,6 +1,6 @@
 package de.iani.playerUUIDCache;
 
-import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.util.config.Configuration;
 
 public class SQLConfig {
     private String host = "localhost";
@@ -19,16 +19,16 @@ public class SQLConfig {
 
     private String namechangestablename = "namechanges";
 
-    public SQLConfig(ConfigurationSection section) {
+    public SQLConfig(Configuration section) {
         if (section != null) {
-            host = section.getString("host", host);
-            user = section.getString("user", user);
-            password = section.getString("password", password);
-            database = section.getString("database", database);
-            tablename = section.getString("tablename", tablename);
-            profilestablename = section.getString("profilestablename", profilestablename);
-            namehistoriestablename = section.getString("namehistoriestablename", namehistoriestablename);
-            namechangestablename = section.getString("namechangestablename", namechangestablename);
+            host = section.getString("database.host", host);
+            user = section.getString("database.user", user);
+            password = section.getString("database.password", password);
+            database = section.getString("database.database", database);
+            tablename = section.getString("database.tablename", tablename);
+            profilestablename = section.getString("database.profilestablename", profilestablename);
+            namehistoriestablename = section.getString("database.namehistoriestablename", namehistoriestablename);
+            namechangestablename = section.getString("database.namechangestablename", namechangestablename);
         }
     }
 

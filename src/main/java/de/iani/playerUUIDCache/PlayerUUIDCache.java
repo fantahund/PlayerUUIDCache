@@ -2,8 +2,9 @@ package de.iani.playerUUIDCache;
 
 import de.iani.playerUUIDCache.NameHistory.NameChange;
 import de.iani.playerUUIDCache.util.fetcher.NameFetcher;
-import de.iani.playerUUIDCache.util.fetcher.ProfileFetcher;
 import de.iani.playerUUIDCache.util.fetcher.UUIDFetcher;
+
+import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -14,7 +15,6 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -23,30 +23,28 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
+import java.util.logging.Logger;
+
+import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerLoginEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.plugin.ServicePriority;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
+import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerListener;
+import org.bukkit.plugin.PluginDescriptionFile;
+import org.bukkit.plugin.PluginLoader;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitRunnable;
 
 public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     public static final long PROFILE_PROPERTIES_CACHE_EXPIRATION_TIME = 1000 * 60 * 60 * 24;// 1 day
-    public static final long PROFILE_PROPERTIES_LOCAL_CACHE_EXPIRATION_TIME = 1000 * 60 * 30;// 30 minutes
 
     protected PluginConfig config;
 
     protected HashMap<String, CachedPlayer> playersByName;
 
     protected HashMap<UUID, CachedPlayer> playersByUUID;
-
-    protected HashMap<UUID, CachedPlayerProfile> playerProfiles;
 
     protected HashMap<UUID, NameHistory> nameHistories;
 
@@ -62,57 +60,24 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     private volatile int databaseUpdates;
     private volatile int databaseQueries;
 
-    private volatile int profilePropertiesLookups;
-    private volatile int profilePropertiesLookupQueries;
-    private boolean hasProfileAPI;
+    private Logger logger;
+    private Thread currentThred;
+
+    public PlayerUUIDCache(PluginLoader pluginLoader, Server instance, PluginDescriptionFile desc, File folder, File plugin, ClassLoader cLoader) {
+        super(pluginLoader, instance, desc, folder, plugin, cLoader);
+    }
+
+
 
     @Override
     public void onEnable() {
-        saveDefaultConfig();
+        currentThred = Thread.currentThread();
+        logger = Logger.getLogger("PlayerUUICache");
         reloadConfig();
-
-        getServer().getPluginManager().registerEvents(new PlayerLoginListener(), this);
-
-        try {
-            Class.forName("com.destroystokyo.paper.profile.PlayerProfile");// check if this is a Paper server with PlayerProfileAPI
-            getLogger().info("Paper Profile API detected, registering listener");
-            getServer().getPluginManager().registerEvents(new PaperProfileAPIListener(this), this);
-            if (config.useSQL()) {
-                getLogger().info("Using profile properties cache");
-                try {
-                    database.createProfilePropertiesTable();
-                    playerProfiles = new HashMap<>();
-                    getServer().getPluginManager().registerEvents(new PaperProfilePropertiesAPIListener(this), this);
-                    new BukkitRunnable() {
-                        @Override
-                        public void run() {
-                            synchronized (PlayerUUIDCache.this) {
-                                if (playerProfiles != null) {
-                                    Iterator<CachedPlayerProfile> it = playerProfiles.values().iterator();
-                                    while (it.hasNext()) {
-                                        CachedPlayerProfile entry = it.next();
-                                        if (entry.getLastSeen() + PROFILE_PROPERTIES_CACHE_EXPIRATION_TIME <= System.currentTimeMillis()) {
-                                            it.remove();
-                                        }
-                                    }
-                                }
-                            }
-                            try {
-                                database.deleteOldPlayerProfiles();
-                            } catch (SQLException e) {
-                                getLogger().log(Level.SEVERE, "Error while trying to access the database", e);
-                            }
-                        }
-                    }.runTaskTimerAsynchronously(this, (long) (Math.random() * 20 * 60 * 60 * 24), 20 * 60 * 60 * 24);
-                } catch (SQLException e) {
-                    getLogger().log(Level.SEVERE, "Could not create profiles table", e);
-                }
-            }
-            hasProfileAPI = true;
-        } catch (ClassNotFoundException e) {
-            // ignore
-        }
-
+        PluginManager pm = getServer().getPluginManager();
+        PlayerLoginListener playerListener = new PlayerLoginListener();
+        pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Lowest, this);
+        pm.registerEvent(Event.Type.PLAYER_QUIT, playerListener, Event.Priority.Lowest, this);
         getServer().getServicesManager().register(PlayerUUIDCacheAPI.class, this, this, ServicePriority.Normal);
     }
 
@@ -132,10 +97,9 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         }
     }
 
-    @Override
+
     public synchronized void reloadConfig() {
         closeDatabase();
-        super.reloadConfig();
         config = new PluginConfig(this);
         if (config.getMemoryCacheExpirationTime() != 0) {
             playersByName = new HashMap<>();
@@ -199,10 +163,6 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
             sender.sendMessage("mojangQueries: " + mojangQueries);
             sender.sendMessage("databaseUpdates: " + databaseUpdates);
             sender.sendMessage("databaseQueries: " + databaseQueries);
-            if (hasProfileAPI) {
-                sender.sendMessage("profilePropertiesLookups: " + profilePropertiesLookups);
-                sender.sendMessage("profilePropertiesLookupQueries: " + profilePropertiesLookupQueries);
-            }
             return true;
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("lookup")) {
@@ -226,7 +186,7 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
             CachedPlayer cachedPlayer = getPlayerFromNameOrUUID(idString, true);
             UUID uuid;
             if (cachedPlayer != null) {
-                uuid = cachedPlayer.getUniqueId();
+                uuid = cachedPlayer.getUUID();
             } else {
                 try {
                     uuid = UUID.fromString(idString);
@@ -269,29 +229,39 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         return true;
     }
 
-    private class PlayerLoginListener implements Listener {
-        @EventHandler(priority = EventPriority.LOWEST)
-        public void onPlayerLogin(PlayerLoginEvent e) {
+    private class PlayerLoginListener extends PlayerListener {
+        public void onPlayerJoin(PlayerEvent e) {
             String name = e.getPlayer().getName();
-            UUID uuid = e.getPlayer().getUniqueId();
+            UUID uuid;
+            try {
+                uuid = new UUIDFetcher(List.of(name)).call().get(name);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
             long now = System.currentTimeMillis();
-            updateEntries(true, new CachedPlayer(uuid, name, now, now));
+            CachedPlayer cachedPlayer = new CachedPlayer(uuid, name, now, now);
+            updateEntries(true, cachedPlayer);
 
-            getNameHistory(e.getPlayer());
-            playerProfiles.remove(e.getPlayer().getUniqueId());
+
+            getNameHistory(cachedPlayer);
         }
 
-        @EventHandler(priority = EventPriority.LOWEST)
-        public void onPlayerQuit(PlayerQuitEvent e) {
+
+        public void onPlayerQuit(PlayerEvent e) {
             String name = e.getPlayer().getName();
-            UUID uuid = e.getPlayer().getUniqueId();
+            UUID uuid;
+            try {
+                uuid = new UUIDFetcher(List.of(name)).call().get(name);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            };
             long now = System.currentTimeMillis();
             updateEntries(true, new CachedPlayer(uuid, name, now, now));
         }
     }
 
     public void importLocalOfflinePlayers() {
-        long now = System.currentTimeMillis();
+        /*long now = System.currentTimeMillis();
         ArrayList<CachedPlayer> toUpdate = new ArrayList<>();
         for (OfflinePlayer p : getServer().getOfflinePlayers()) {
             if (p.getName() != null && p.getUniqueId() != null) {
@@ -305,12 +275,7 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         }
         if (toUpdate.size() > 0) {
             updateEntries(true, toUpdate.toArray(new CachedPlayer[toUpdate.size()]));
-        }
-    }
-
-    @Override
-    public CachedPlayer getPlayer(OfflinePlayer player) {
-        return getPlayer(player.getUniqueId());
+        }*/
     }
 
     @Override
@@ -363,6 +328,11 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     }
 
     @Override
+    public CachedPlayer getPlayer(Player player) {
+        return getPlayer(player.getName());
+    }
+
+    @Override
     public CachedPlayer getPlayer(String playerName) {
         name2uuidLookups++;
         synchronized (this) {
@@ -402,7 +372,7 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     @Override
     public Future<CachedPlayer> loadPlayerAsynchronously(final String playerName) {
         FutureTask<CachedPlayer> futuretask = new FutureTask<>(() -> getPlayerFromMojang(playerName));
-        getServer().getScheduler().runTaskAsynchronously(this, futuretask);
+        getServer().getScheduler().scheduleAsyncDelayedTask(this, futuretask);
         return futuretask;
     }
 
@@ -411,18 +381,18 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         final CachedPlayer entry = getPlayer(playerName);
         if (entry != null) {
             if (synchronousCallback != null) {
-                if (Bukkit.isPrimaryThread()) {
+                if (isPrimaryThread()) {
                     synchronousCallback.onComplete(entry);
                 } else {
-                    getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(entry));
+                    getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(entry));
                 }
             }
             return;
         }
-        getServer().getScheduler().runTaskAsynchronously(this, (Runnable) () -> {
+        getServer().getScheduler().scheduleAsyncDelayedTask(this, (Runnable) () -> {
             final CachedPlayer p = getPlayerFromMojang(playerName);
             if (synchronousCallback != null) {
-                getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(p));
+                getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(p));
             }
         });
     }
@@ -467,7 +437,7 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     @Override
     public Future<CachedPlayer> loadPlayerAsynchronously(final UUID playerUUID) {
         FutureTask<CachedPlayer> futuretask = new FutureTask<>(() -> getPlayerFromMojang(playerUUID));
-        getServer().getScheduler().runTaskAsynchronously(this, futuretask);
+        getServer().getScheduler().scheduleAsyncDelayedTask(this, futuretask);
         return futuretask;
     }
 
@@ -476,18 +446,18 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         final CachedPlayer entry = getPlayer(playerUUID);
         if (entry != null) {
             if (synchronousCallback != null) {
-                if (Bukkit.isPrimaryThread()) {
+                if (isPrimaryThread()) {
                     synchronousCallback.onComplete(entry);
                 } else {
-                    getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(entry));
+                    getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(entry));
                 }
             }
             return;
         }
-        getServer().getScheduler().runTaskAsynchronously(this, (Runnable) () -> {
+        getServer().getScheduler().scheduleAsyncDelayedTask(this, (Runnable) () -> {
             final CachedPlayer p = getPlayerFromMojang(playerUUID);
             if (synchronousCallback != null) {
-                getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(p));
+                getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(p));
             }
         });
     }
@@ -499,10 +469,10 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
                 if (playerName.equalsIgnoreCase(e.getKey())) {
                     long now = System.currentTimeMillis();
                     final CachedPlayer entry = new CachedPlayer(e.getValue(), e.getKey(), now, now);
-                    if (getServer().isPrimaryThread()) {
+                    if (isPrimaryThread()) {
                         updateEntries(true, entry);
                     } else {
-                        getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> updateEntries(true, entry));
+                        getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> updateEntries(true, entry));
                     }
                     return entry;
                 }
@@ -520,10 +490,10 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
                 if (playerUUID.equals(e.getKey())) {
                     long now = System.currentTimeMillis();
                     final CachedPlayer entry = new CachedPlayer(e.getKey(), e.getValue(), now, now);
-                    if (getServer().isPrimaryThread()) {
+                    if (isPrimaryThread()) {
                         updateEntries(true, entry);
                     } else {
-                        getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> updateEntries(true, entry));
+                        getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> updateEntries(true, entry));
                     }
                     return entry;
                 }
@@ -624,114 +594,17 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         }
     }
 
-    protected synchronized void updateProfileProperties(boolean updateDB, CachedPlayerProfile entry) {
-        if (playerProfiles != null) {
-            CachedPlayerProfile oldEntry = playerProfiles.get(entry.getUUID());
-            if (oldEntry == null || oldEntry.getLastSeen() <= entry.getLastSeen()) {
-                playerProfiles.put(entry.getUUID(), entry);
-            }
-        }
-        if (updateDB) {
-            if (database != null) {
-                try {
-                    databaseUpdates++;
-                    database.addOrUpdatePlayerProfile(entry);
-                } catch (SQLException e) {
-                    getLogger().log(Level.SEVERE, "Error while trying to access the database", e);
-                }
-            }
-        }
-    }
-
-    public CachedPlayerProfile getPlayerProfile(UUID playerUUID) {
-        profilePropertiesLookups++;
-        synchronized (this) {
-            if (playerProfiles != null) {
-                CachedPlayerProfile entry = playerProfiles.get(playerUUID);
-                if (entry != null) {
-                    long now = System.currentTimeMillis();
-                    if (entry.getCacheLoadTime() + PROFILE_PROPERTIES_LOCAL_CACHE_EXPIRATION_TIME > now && entry.getExpiration() > now) {
-                        return entry;
-                    } else {
-                        playerProfiles.remove(playerUUID);
-                    }
-                }
-            }
-        }
-        if (database != null) {
-            try {
-                profilePropertiesLookupQueries++;
-                CachedPlayerProfile entry = database.getPlayerProfile(playerUUID);
-                if (entry != null && entry.getExpiration() > System.currentTimeMillis()) {
-                    updateProfileProperties(false, entry);
-                    return entry;
-                }
-            } catch (SQLException e) {
-                getLogger().log(Level.SEVERE, "Error while trying to access the database", e);
-            }
-        }
-        return null;
-    }
-
-    public Future<CachedPlayerProfile> loadPlayerProfileAsynchronously(final UUID playerUUID) {
-        FutureTask<CachedPlayerProfile> futuretask = new FutureTask<>(() -> getPlayerProfileFromMojang(playerUUID));
-        getServer().getScheduler().runTaskAsynchronously(this, futuretask);
-        return futuretask;
-    }
-
-    public CachedPlayerProfile getPlayerProfile(UUID playerUUID, boolean queryMojangIfUnknown) {
-        CachedPlayerProfile entry = getPlayerProfile(playerUUID);
-        if (entry != null || !queryMojangIfUnknown) {
-            return entry;
-        }
-        return getPlayerProfileFromMojang(playerUUID);
-    }
-
-    public void getPlayerProfileAsynchronously(final UUID playerUUID, final Callback<CachedPlayerProfile> synchronousCallback) {
-        final CachedPlayerProfile entry = getPlayerProfile(playerUUID);
-        if (entry != null) {
-            if (synchronousCallback != null) {
-                if (Bukkit.isPrimaryThread()) {
-                    synchronousCallback.onComplete(entry);
-                } else {
-                    getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(entry));
-                }
-            }
-            return;
-        }
-        getServer().getScheduler().runTaskAsynchronously(this, (Runnable) () -> {
-            final CachedPlayerProfile p = getPlayerProfileFromMojang(playerUUID);
-            if (synchronousCallback != null) {
-                getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(p));
-            }
-        });
-    }
-
-    protected CachedPlayerProfile getPlayerProfileFromMojang(UUID playerUUID) {
-        mojangQueries++;
-        try {
-            CachedPlayerProfile entry = new ProfileFetcher(playerUUID).call();
-            if (entry != null) {
-                updateProfileProperties(true, entry);
-            }
-            return entry;
-        } catch (Exception e) {
-            getLogger().log(Level.SEVERE, "Error while trying to load player profile: " + playerUUID, e);
-        }
-        return null;
-    }
-
     @Override
-    public NameHistory getNameHistory(OfflinePlayer player) {
-        NameHistory history = getNameHistory(player.getUniqueId());
+    public NameHistory getNameHistory(CachedPlayer player) {
+        NameHistory history = getNameHistory(player.getUUID());
         String currentName = player.getName();
         if (currentName != null) {
             long time = System.currentTimeMillis();
             if (history == null) {
-                history = new NameHistory(player.getUniqueId(), currentName, List.of(), time);
+                history = new NameHistory(player.getUUID(), currentName, List.of(), time);
                 updateHistory(true, history);
             } else if (!currentName.equals(history.getName(time))) {
-                history = getNameHistoryInternal(player.getUniqueId(), true); // force reload from database to avoid outdated cache
+                history = getNameHistoryInternal(player.getUUID(), true); // force reload from database to avoid outdated cache
                 if (!currentName.equals(history.getName(time))) {
                     ArrayList<NameChange> nameChanges = new ArrayList<>(history.getNameChanges());
                     nameChanges.add(new NameChange(currentName, time));
@@ -790,10 +663,10 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         final NameHistory history = getNameHistory(playerUUID);
         if (history != null) {
             if (synchronousCallback != null) {
-                if (Bukkit.isPrimaryThread()) {
+                if (isPrimaryThread()) {
                     synchronousCallback.onComplete(history);
                 } else {
-                    getServer().getScheduler().runTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(history));
+                    getServer().getScheduler().scheduleSyncDelayedTask(PlayerUUIDCache.this, (Runnable) () -> synchronousCallback.onComplete(history));
                 }
             }
             return;
@@ -836,7 +709,7 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
 
         CachedPlayer current = getPlayer(name, false);
         if (current != null) {
-            result.add(current.getUniqueId());
+            result.add(current.getUUID());
         }
 
         return result;
@@ -858,4 +731,11 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         }
     }
 
+    public Logger getLogger() {
+        return logger;
+    }
+
+    private boolean isPrimaryThread() {
+        return currentThred.equals(Thread.currentThread());
+    }
 }

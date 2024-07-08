@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Future;
-import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 
 public interface PlayerUUIDCacheAPI {
     /**
@@ -17,7 +17,7 @@ public interface PlayerUUIDCacheAPI {
      *            the player to lookup
      * @return the CachedPlayer or null
      */
-    CachedPlayer getPlayer(OfflinePlayer player);
+    CachedPlayer getPlayer(Player player);
 
     /**
      * Gets a CachedPlayer for a name.
@@ -207,8 +207,8 @@ public interface PlayerUUIDCacheAPI {
      *            the player
      * @return the NameHistory or null
      */
-    default NameHistory getNameHistory(OfflinePlayer player) {
-        return getNameHistory(player.getUniqueId());
+    default NameHistory getNameHistory(CachedPlayer player) {
+        return getNameHistory(player.getUUID());
     }
 
     /**
@@ -244,8 +244,8 @@ public interface PlayerUUIDCacheAPI {
      * @deprecated Mojang has removed the required API
      */
     @Deprecated(forRemoval = true)
-    default NameHistory getNameHistory(OfflinePlayer player, boolean queryMojangIfUnknown) {
-        return getNameHistory(player.getUniqueId());
+    default NameHistory getNameHistory(CachedPlayer player, boolean queryMojangIfUnknown) {
+        return getNameHistory(player.getUUID());
     }
 
     /**
