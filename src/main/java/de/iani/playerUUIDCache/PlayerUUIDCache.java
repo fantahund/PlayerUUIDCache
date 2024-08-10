@@ -4,7 +4,6 @@ import de.iani.playerUUIDCache.NameHistory.NameChange;
 import de.iani.playerUUIDCache.util.fetcher.NameFetcher;
 import de.iani.playerUUIDCache.util.fetcher.UUIDFetcher;
 
-import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -25,22 +24,17 @@ import java.util.concurrent.FutureTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.bukkit.Server;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerListener;
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.config.Configuration;
 
 public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
-    public static final long PROFILE_PROPERTIES_CACHE_EXPIRATION_TIME = 1000 * 60 * 60 * 24;// 1 day
-
     protected PluginConfig config;
 
     protected HashMap<String, CachedPlayer> playersByName;
@@ -64,12 +58,6 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
     private Logger logger;
     private Thread currentThred;
 
-    public PlayerUUIDCache(PluginLoader pluginLoader, Server instance, PluginDescriptionFile desc, File folder, File plugin, ClassLoader cLoader) {
-        super(pluginLoader, instance, desc, folder, plugin, cLoader);
-    }
-
-
-
     @Override
     public void onEnable() {
         currentThred = Thread.currentThread();
@@ -80,7 +68,6 @@ public class PlayerUUIDCache extends JavaPlugin implements PlayerUUIDCacheAPI {
         PlayerLoginListener playerListener = new PlayerLoginListener();
         pm.registerEvent(Event.Type.PLAYER_JOIN, playerListener, Event.Priority.Lowest, this);
         pm.registerEvent(Event.Type.PLAYER_QUIT, playerListener, Event.Priority.Lowest, this);
-        //TODO REGISTER getServer().getServicesManager().register(PlayerUUIDCacheAPI.class, this, this, ServicePriority.Normal);
     }
 
     @Override

@@ -3,9 +3,9 @@
   <groupId>org.bukkit</groupId>
   <artifactId>CraftBukkit</artifactId>
   <versioning>
-    <latest>1.2beta</latest>
+    <latest>1.3beta</latest>
     <versions>
-      <version>1.2beta</version>
+      <version>1.3beta</version>
     </versions>
     <lastUpdated>20220718190218</lastUpdated>
   </versioning>

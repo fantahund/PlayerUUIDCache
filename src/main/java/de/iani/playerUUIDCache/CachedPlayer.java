@@ -1,10 +1,14 @@
 package de.iani.playerUUIDCache;
 
 import java.net.InetSocketAddress;
+import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
 
 import org.bukkit.Location;
+import org.bukkit.Server;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Entity;
@@ -83,6 +87,10 @@ public final class CachedPlayer implements Player {
     }
 
     @Override
+    public void chat(String s) {
+    }
+
+    @Override
     public boolean performCommand(String s) {
         return false;
     }
@@ -94,6 +102,11 @@ public final class CachedPlayer implements Player {
 
     @Override
     public void setSneaking(boolean b) {
+
+    }
+
+    @Override
+    public void updateInventory() {
 
     }
 
@@ -178,6 +191,31 @@ public final class CachedPlayer implements Player {
     }
 
     @Override
+    public int getFireTicks() {
+        return 0;
+    }
+
+    @Override
+    public int getMaxFireTicks() {
+        return 0;
+    }
+
+    @Override
+    public void setFireTicks(int i) {
+
+    }
+
+    @Override
+    public void remove() {
+
+    }
+
+    @Override
+    public Server getServer() {
+        return null;
+    }
+
+    @Override
     public int getHealth() {
         return 0;
     }
@@ -185,6 +223,31 @@ public final class CachedPlayer implements Player {
     @Override
     public void setHealth(int i) {
 
+    }
+
+    @Override
+    public double getEyeHeight() {
+        return 0;
+    }
+
+    @Override
+    public double getEyeHeight(boolean b) {
+        return 0;
+    }
+
+    @Override
+    public List<Block> getLineOfSight(HashSet<Byte> hashSet, int i) {
+        return List.of();
+    }
+
+    @Override
+    public Block getTargetBlock(HashSet<Byte> hashSet, int i) {
+        return null;
+    }
+
+    @Override
+    public List<Block> getLastTwoTargetBlocks(HashSet<Byte> hashSet, int i) {
+        return List.of();
     }
 
     @Override
